@@ -1,0 +1,50 @@
+# Counselling data for Mochi's counselling helper.
+#
+# Add an MCC "Final Allotment Result" PDF (mcc.nic.in → PG Medical Counselling) to
+# data/counselling/incoming/ (GitHub → Add file → Upload files). This job reads it, updates
+# data/counselling/<year>.json and index.json (served on GitHub Pages, which the apps download),
+# and removes the PDF. A new round reaches every app within minutes, without an app update.
+# It can also be started by hand (Actions → Counselling data → Run workflow).
+name: Counselling data
+
+on:
+  push:
+    paths:
+      - 'data/counselling/incoming/**.pdf'
+      - 'data/counselling/incoming/**.PDF'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: counselling-data
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pdftotext
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - name: Import new allotment results
+        id: import
+        run: |
+          shopt -s nullglob nocaseglob
+          files=(data/counselling/incoming/*.pdf)
+          if [ ${#files[@]} -eq 0 ]; then echo "No PDFs in incoming/."; echo "imported=0" >> "$GITHUB_OUTPUT"; exit 0; fi
+          node --no-warnings scripts/counselling/import-mcc.mjs data/counselling "${files[@]}"
+      - name: Publish
+        if: steps.import.outputs.imported != '0'
+        run: |
+          git config user.name "mochi-bot"
+          git config user.email "mochi-bot@users.noreply.github.com"
+          git rm -q --cached data/counselling/incoming/*.pdf data/counselling/incoming/*.PDF 2>/dev/null || true
+          rm -f data/counselling/incoming/*.pdf data/counselling/incoming/*.PDF
+          git add data/counselling/*.json
+          git commit -m "Counselling data: import $(date -u +%Y-%m-%d)" || exit 0
+          git push
