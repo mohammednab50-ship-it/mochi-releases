@@ -90,12 +90,14 @@ export function parseAllotment(raw: string): AllotmentRow[] {
     const [, middle, seatRaw, , remark] = m;
     const seat = seatCategory(seatRaw!);
     if (!seat) return;
-    // DNB seats: "<hospital, address> (NBEMS) GENERAL MEDICINE" — the course follows "(NBEMS)" in capitals.
-    const nbems = middle!.lastIndexOf('(NBEMS)');
-    const c = nbems > 0 ? nbems : middle!.search(COURSE_START);
+    // DNB seats: "<hospital, address> (NBEMS) GENERAL MEDICINE", and NBEMS diplomas:
+    // "<hospital> (NBEMS-DIPLOMA) ANAESTHESIOLOGY". The course follows the tag, in capitals.
+    // (Checked first: hospital names can themselves contain "DNB" or "DIPLOMA".)
+    const tag = [...middle!.matchAll(/\(NBEMS(-DIPLOMA)?\)/g)].at(-1);
+    const c = tag ? tag.index! : middle!.search(COURSE_START);
     if (c <= 0) return;
     const institute = instituteName(middle!.slice(0, c));
-    const course = nbems > 0 ? `DNB ${titleCase(middle!.slice(nbems + 7))}` : courseName(middle!.slice(c));
+    const course = tag ? `${tag[1] ? 'NBEMS Diploma' : 'DNB'} ${titleCase(middle!.slice(c + tag[0].length))}` : courseName(middle!.slice(c));
     if (!institute || !course) return;
     rows.push({ rank: s.rank, quota: s.quota, institute, course, seat, pwd: / PwD$/.test(seatRaw!), remark: remark!.trim() });
   });
