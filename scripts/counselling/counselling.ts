@@ -56,7 +56,9 @@ const titleCase = (s: string) =>
     .trim()
     .toLowerCase()
     .replace(/\b([a-z])([a-z]*)/g, (w, a: string, b: string) => (SMALL.has(w) ? w : a.toUpperCase() + b))
-    .replace(/^([a-z])/, (a) => a.toUpperCase());
+    .replace(/^([a-z])/, (a) => a.toUpperCase())
+    // Abbreviations stay in capitals: ENT, OBG, ICU…
+    .replace(/\b(Ent|Obg|Icu|Ivf|Hiv|Ct|Mri)\b/g, (w) => w.toUpperCase());
 
 /** "Name, City,ADDRESS…" → "Name, City" (the address starts after a comma with no space). */
 export function instituteName(s: string): string {
